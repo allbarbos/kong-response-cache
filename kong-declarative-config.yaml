@@ -1,0 +1,26 @@
+_format_version: "1.1"
+
+services:
+  - name: plugin-test-srv
+    url: https://mockbin.com/request
+    routes:
+      - name: request-route
+        methods:
+          - GET
+        paths:
+          - "/request/(?<userId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})($|/$)"
+    plugins:
+      - name: response-cache
+        config:
+          strategy: redis
+          content_type:
+            - application/json; charset=utf-8
+          redis:
+            database: 0
+            host: cache
+            port: 6379
+            # redis_timeout:
+            # redis_password:
+          data_mapper:
+            - source: "path"
+              param: "userId"
