@@ -218,6 +218,39 @@ function _M:purge(key)
 end
 
 
+function _M:flush(free_mem)
+  local red, err_redis = connect(
+    self.opts.database,
+    self.opts.host,
+    self.opts.port,
+    self.opts.timeout,
+    self.opts.password
+  )
+
+  -- Compruebo si he conectado a Redis bien
+  if not red then
+    kong_err("failed to get the Redis connection: ", err_redis)
+    return nil, "there is no Redis connection established"
+  end
+
+  -- aquí borro toda la cache de redis de forma asíncrona
+  local flushed, err = red:flushdb("async")
+  if err then
+    kong_err("failed to flush the database from Redis: ", err)
+    return nil, err
+  end
+
+  local ok, err2 = red:set_keepalive(10000, 100)
+  if not ok then
+    kong_err("failed to set Redis keepalive: ", err2)
+    return nil, err2
+  end
+
+  return true
+end
+
+return _M
+
 --- Reset TTL for a cached request
 -- function _M:touch(key, req_ttl, timestamp)
 --   if type(key) ~= "string" then
@@ -254,35 +287,3 @@ end
 -- @param free_mem Boolean indicating whether to free the memory; if false,
 --   entries will only be marked as expired
 -- @return true on success, nil plus error message otherwise
-function _M:flush(free_mem)
-  local red, err_redis = connect(
-    self.opts.database,
-    self.opts.host,
-    self.opts.port,
-    self.opts.timeout,
-    self.opts.password
-  )
-
-  -- Compruebo si he conectado a Redis bien
-  if not red then
-    kong_err("failed to get the Redis connection: ", err_redis)
-    return nil, "there is no Redis connection established"
-  end
-
-  -- aquí borro toda la cache de redis de forma asíncrona
-  local flushed, err = red:flushdb("async")
-  if err then
-    kong_err("failed to flush the database from Redis: ", err)
-    return nil, err
-  end
-
-  local ok, err2 = red:set_keepalive(10000, 100)
-  if not ok then
-    kong_err("failed to set Redis keepalive: ", err2)
-    return nil, err2
-  end
-
-  return true
-end
-
-return _M

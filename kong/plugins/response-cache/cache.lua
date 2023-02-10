@@ -1,11 +1,12 @@
-local fmt = string.format
-local ipairs = ipairs
-local type = type
-local pairs = pairs
-local sort = table.sort
-local insert = table.insert
-local concat = table.concat
-local time = ngx.time
+local fmt        = string.format
+local ipairs     = ipairs
+local type       = type
+local pairs      = pairs
+local sort       = table.sort
+local insert     = table.insert
+local concat     = table.concat
+local time       = ngx.time
+local ngx_re_sub = ngx.re.gsub
 
 local sha256_hex = require "kong.tools.utils".sha256_hex
 
@@ -94,11 +95,10 @@ end
 
 
 
-local function build_cache_key(consumer_id, route_id, method, uri, params_table, headers_table, conf)
+local function build_random_key(consumer_id, route_id, method, uri, params_table, headers_table, conf)
   local prefix_digest  = prefix_uuid(consumer_id, route_id)
   local params_digest  = params_key(params_table, conf)
   local headers_digest = headers_key(headers_table, conf)
-
   return sha256_hex(fmt("%s|%s|%s|%s|%s", prefix_digest, method, uri, params_digest, headers_digest))
 end
 
@@ -122,11 +122,33 @@ local function store_cache_value(premature, conf, strategy, req_body, status, re
   end
 end
 
+
+local function build_key(conf)
+  local cache_key, err
+  if conf.data_mapper then
+    for _, mapper in pairs(conf.data_mapper) do
+      if mapper.source == "path" then
+        cache_key = ngx.ctx.router_matches.uri_captures[mapper.param]
+      end
+    end
+  else
+    local consumer = kong.client.get_consumer()
+    local route = kong.router.get_route()
+    local uri = ngx_re_sub(ngx.var.request, "\\?.*", "", "oj")
+    cache_key, err = build_random_key(consumer and consumer.id,
+                                      route and route.id,
+                                      kong.request.get_method(),
+                                      uri,
+                                      kong.request.get_query(),
+                                      kong.request.get_headers(),
+                                      conf)
+  end
+  return cache_key, err
+end
+
+
 return {
   CACHE_VERSION = CACHE_VERSION,
-  params_key = params_key,
-  headers_key = headers_key,
-  prefix_uuid = prefix_uuid,
-  build_cache_key = build_cache_key,
   store_cache_value = store_cache_value,
+  build_key = build_key,
 }

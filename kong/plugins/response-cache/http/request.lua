@@ -1,10 +1,4 @@
-local header = require "kong.plugins.response-cache.http.header"
-
-local function req_cc()
-  return header.parse_directive(ngx.var.http_cache_control)
-end
-
-local function is_cacheable(conf, cc)
+local function is_cacheable(conf)
   -- TODO refactor these searches to O(1)
   do
     local method = kong.request.get_method()
@@ -33,7 +27,6 @@ local function signal_cache_req(ctx, cache_key, cache_status)
 end
 
 return {
-  req_cc = req_cc,
   is_cacheable = is_cacheable,
   signal_cache = signal_cache_req,
 }

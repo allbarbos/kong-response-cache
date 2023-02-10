@@ -1,13 +1,12 @@
 local plugin = {
   PRIORITY = 100,
-  VERSION = "1.0.0",
+  VERSION = "0.0.2",
 }
 
 local ngx              = ngx
 local kong             = kong
 local floor            = math.floor
 local time             = ngx.time
-local ngx_re_sub       = ngx.re.gsub
 local resp_get_headers = ngx.resp and ngx.resp.get_headers
 
 local cache = require "kong.plugins.response-cache.cache"
@@ -18,34 +17,12 @@ local response = require "kong.plugins.response-cache.http.response"
 local STRATEGY_PATH = "kong.plugins.response-cache.strategies"
 
 function plugin:access(conf)
-  local cc = request.req_cc()
-
-  if not request.is_cacheable(conf, cc) then
+  if not request.is_cacheable(conf) then
     kong.response.set_header("X-Cache-Status", "Bypass")
     return
   end
 
-  local cache_key, err
-
-  if conf.data_mapper then
-    for _, mapper in pairs(conf.data_mapper) do
-      if mapper.source == "path" then
-        cache_key = ngx.ctx.router_matches.uri_captures[mapper.param]
-      end
-    end
-  else
-    local consumer = kong.client.get_consumer()
-    local route = kong.router.get_route()
-    local uri = ngx_re_sub(ngx.var.request, "\\?.*", "", "oj")
-    cache_key, err = cache.build_cache_key(consumer and consumer.id,
-                                            route    and route.id,
-                                            kong.request.get_method(),
-                                            uri,
-                                            kong.request.get_query(),
-                                            kong.request.get_headers(),
-                                            conf)
-  end
-
+  local cache_key, err = cache.build_key(conf)
   if err then
     kong.log.err(err)
     return
@@ -53,7 +30,6 @@ function plugin:access(conf)
 
   kong.response.set_header("X-Cache-Key", cache_key)
 
-  -- try to fetch the cached object from the computed cache key
   local strategy = require(STRATEGY_PATH)({
     strategy_name = conf.strategy,
     strategy_opts = conf[conf.strategy],
@@ -107,15 +83,12 @@ function plugin:header_filter(conf)
     return
   end
 
-  local cc = response.res_cc()
-
-  if response.is_cacheable(conf, cc) then
+  if response.is_cacheable(conf) then
     response_cache.res_headers = resp_get_headers(0, true)
   else
     kong.response.set_header("X-Cache-Status", "Bypass")
     ctx.response_cache = nil
   end
-
 end
 
 function plugin:body_filter(conf)
@@ -134,11 +107,10 @@ function plugin:body_filter(conf)
 
     local chunk = ngx.arg[1]
     local eof = ngx.arg[2]
-
     response_cache.res_body = (response_cache.res_body or "") .. (chunk or "")
 
     if eof then
-        ngx.timer.at(0, cache.store_cache_value, conf, strategy, ctx.req_body, kong.response.get_status(), response_cache)
+      ngx.timer.at(0, cache.store_cache_value, conf, strategy, ctx.req_body, kong.response.get_status(), response_cache)
     end
   end
 end
