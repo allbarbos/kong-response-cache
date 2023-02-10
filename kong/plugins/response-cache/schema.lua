@@ -3,15 +3,12 @@ local strategies = require "kong.plugins.response-cache.strategies"
 
 local PLUGIN_NAME = "response-cache"
 
-
 local schema = {
   name = PLUGIN_NAME,
   fields = {
-    -- the 'fields' array is the top-level entry with fields defined by Kong
-    { consumer = typedefs.no_consumer },  -- this plugin cannot be configured on a consumer (typical for auth plugins)
+    { consumer = typedefs.no_consumer },
     { protocols = typedefs.protocols_http },
     { config = {
-        -- The 'config' record is the custom part of the plugin schema
         type = "record",
         fields = {
           -- a standard defined field (typedef), with some customizations
@@ -21,12 +18,6 @@ local schema = {
           -- { response_header = typedefs.header_name {
           --     required = true,
           --     default = "Bye-World" } },
-          -- { ttl = { -- self defined field
-          --     type = "integer",
-          --     default = 600,
-          --     required = true,
-          --     gt = 0, }
-          -- }, -- adding a constraint for the value
           {
             request_method = {
               type = "array",
