@@ -1,6 +1,6 @@
 local plugin_name = "response-cache"
 local package_name = "kong-plugin-" .. plugin_name
-local package_version = "0.0.1"
+local package_version = "0.0.2"
 local rockspec_revision = "1"
 local github_account_name = "allbarbos"
 local github_repo_name = "kong-response-cache"

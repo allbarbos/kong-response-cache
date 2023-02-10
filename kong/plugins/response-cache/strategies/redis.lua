@@ -66,7 +66,6 @@ local function connect(db, host, port, timeout, password)
       end
     end
   end
-  kong.log.inspect("connect fim")
   return red
 end
 
@@ -85,9 +84,6 @@ function _M:store(key, req_obj, req_ttl)
     self.opts.timeout,
     self.opts.password
   )
-
-  kong.log.inspect("bileeeee", red)
-  kong.log.inspect("err_redis", err_redis)
 
   if not red then
     kong_err("failed to get the Redis connection: ", err_redis)
