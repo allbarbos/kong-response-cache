@@ -1,22 +1,22 @@
-local fmt        = string.format
-local ipairs     = ipairs
-local type       = type
-local pairs      = pairs
-local sort       = table.sort
-local insert     = table.insert
-local concat     = table.concat
-local time       = ngx.time
-local ngx_re_sub = ngx.re.gsub
+local fmt           = string.format
+local ipairs        = ipairs
+local type          = type
+local pairs         = pairs
+local sort          = table.sort
+local insert        = table.insert
+local concat        = table.concat
+local time          = ngx.time
+local ngx_re_sub    = ngx.re.gsub
 
-local sha256_hex = require "kong.tools.utils".sha256_hex
+local sha256_hex    = require "kong.tools.utils".sha256_hex
 
-local EMPTY = {}
+local EMPTY         = {}
 local CACHE_VERSION = 1
 
 local function keys(t)
   local res = {}
   for k, _ in pairs(t) do
-    res[#res+1] = k
+    res[#res + 1] = k
   end
 
   return res
@@ -37,10 +37,8 @@ local function generate_key_from(args, vary_fields)
       if type(arg) == "table" then
         sort(arg)
         insert(cache_key, field .. "=" .. concat(arg, ","))
-
       elseif arg == true then
         insert(cache_key, field)
-
       else
         insert(cache_key, field .. "=" .. tostring(arg))
       end
@@ -116,9 +114,10 @@ local function store_cache_value(premature, conf, strategy, req_body, status, re
   }
 
   local ttl = conf.storage_ttl or conf.cache_control and response_cache.res_ttl or conf.cache_ttl
+
   local ok, err = strategy:store(response_cache.cache_key, res, ttl)
   if not ok then
-      kong.log.err(err)
+    kong.log.err(err)
   end
 end
 
@@ -136,12 +135,12 @@ local function build_key(conf)
     local route = kong.router.get_route()
     local uri = ngx_re_sub(ngx.var.request, "\\?.*", "", "oj")
     cache_key, err = build_random_key(consumer and consumer.id,
-                                      route and route.id,
-                                      kong.request.get_method(),
-                                      uri,
-                                      kong.request.get_query(),
-                                      kong.request.get_headers(),
-                                      conf)
+      route and route.id,
+      kong.request.get_method(),
+      uri,
+      kong.request.get_query(),
+      kong.request.get_headers(),
+      conf)
   end
   return cache_key, err
 end

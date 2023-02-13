@@ -1,4 +1,4 @@
-local plugin = {
+local plugin           = {
   PRIORITY = 100,
   VERSION = "0.0.2",
 }
@@ -9,12 +9,12 @@ local floor            = math.floor
 local time             = ngx.time
 local resp_get_headers = ngx.resp and ngx.resp.get_headers
 
-local cache = require "kong.plugins.response-cache.cache"
-local header = require "kong.plugins.response-cache.http.header"
-local request = require "kong.plugins.response-cache.http.request"
-local response = require "kong.plugins.response-cache.http.response"
+local cache            = require "kong.plugins.response-cache.cache"
+local header           = require "kong.plugins.response-cache.http.header"
+local request          = require "kong.plugins.response-cache.http.request"
+local response         = require "kong.plugins.response-cache.http.response"
 
-local STRATEGY_PATH = "kong.plugins.response-cache.strategies"
+local STRATEGY_PATH    = "kong.plugins.response-cache.strategies"
 
 function plugin:access(conf)
   if not request.is_cacheable(conf) then

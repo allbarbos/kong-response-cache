@@ -13,7 +13,7 @@ _M.STRATEGY_TYPES = {
 _M.LOCAL_DATA_STRATEGIES = {
   memory = true,
   [1]    = "memory",
-  redis = true,
+  redis  = true,
   [2]    = "redis",
 }
 

@@ -1,6 +1,6 @@
-local ngx           = ngx
-local ngx_re_match  = ngx.re.match
-local lower         = string.lower
+local ngx                = ngx
+local ngx_re_match       = ngx.re.match
+local lower              = string.lower
 
 -- http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html#sec13.5.1
 -- note content-length is not strictly hop-by-hop but we will be

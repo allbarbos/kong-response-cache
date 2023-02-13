@@ -1,12 +1,12 @@
-local cjson = require "cjson.safe"
-local redis = require "resty.redis"
+local cjson        = require "cjson.safe"
+local redis        = require "resty.redis"
 
 local ngx          = ngx
 local type         = type
 local setmetatable = setmetatable
 local kong_err     = kong.log.err
 
-local _M = {}
+local _M           = {}
 
 --- Create new redis strategy object
 function _M.new(opts)
@@ -24,7 +24,6 @@ local function is_present(str)
 end
 
 local function connect(db, host, port, timeout, password)
-  -- kong.log.inspect("connect", db, host, port, timeout, password)
   local red, err_redis = redis:new()
   if err_redis then
     kong_err("error connecting to Redis: ", err_redis);
@@ -96,30 +95,25 @@ function _M:store(key, req_obj, req_ttl)
     return nil, "key must be a string"
   end
 
-  kong.log.inspect("req_obj", req_obj)
-
-  -- encode request table representation as JSON
   local req_json = cjson.encode(req_obj)
   if not req_json then
     return nil, "could not encode request object"
   end
 
-  -- Hago efectivo el guardado
-  -- inicio la transacción
   red:init_pipeline()
-  -- guardo
   red:set(key, req_json)
-  -- TTL
-  red:expire(key, ttl)
 
-  -- ejecuto la transacción
+  kong.log.debug("redis expire ttl: ", ttl)
+  if ttl > 0 then
+    red:expire(key, ttl)
+  end
+
   local _, err = red:commit_pipeline()
   if err then
     kong_err("failed to commit the cache value to Redis: ", err)
     return nil, err
   end
 
-  -- keepalive de la conexión: max_timeout, connection pool
   local ok, err2 = red:set_keepalive(10000, 100)
   if not ok then
     kong_err("failed to set Redis keepalive: ", err2)
@@ -128,7 +122,6 @@ function _M:store(key, req_obj, req_ttl)
 
   return true and req_json or nil, err
 end
-
 
 --- Fetch a cached request
 -- @string key The request key
@@ -173,12 +166,11 @@ function _M:fetch(key)
   -- decode object from JSON to table
   local req_obj = cjson.decode(req_json)
   if not req_obj then
-      return nil, "could not decode request object"
+    return nil, "could not decode request object"
   end
 
   return req_obj
 end
-
 
 --- Purge an entry from the request cache
 -- @return true on success, nil plus error message otherwise
@@ -216,7 +208,6 @@ function _M:purge(key)
 
   return true
 end
-
 
 function _M:flush(free_mem)
   local red, err_redis = connect(

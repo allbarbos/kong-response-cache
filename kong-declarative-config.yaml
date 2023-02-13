@@ -12,6 +12,7 @@ services:
     plugins:
       - name: response-cache
         config:
+          cache_ttl: 0
           strategy: redis
           content_type:
             - application/json; charset=utf-8
@@ -21,6 +22,6 @@ services:
             port: 6379
             # redis_timeout:
             # redis_password:
-          data_mapper:
-            - source: "path"
-              param: "userId"
+          # data_mapper:
+          #   - source: "path"
+          #     param: "userId"
