@@ -1,7 +1,7 @@
 local plugin_name = "response-cache"
 local package_name = "kong-plugin-" .. plugin_name
 local package_version = "0.0.3"
-local rockspec_revision = "1"
+local rockspec_revision = "2"
 local github_account_name = "allbarbos"
 local github_repo_name = "kong-response-cache"
 local git_checkout = package_version == "dev" and "master" or package_version
