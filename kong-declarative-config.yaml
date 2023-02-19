@@ -8,15 +8,18 @@ services:
         methods:
           - GET
         paths:
-          - "/request"
+          - "/request/(?<aggregateID>allan)"
     plugins:
       - name: response-cache
         config:
           cache_ttl: 0
           strategy: redis
           content_type:
-            - application/json; charset=utf-8
+            - application/json
           redis:
             database: 0
             host: cache
             port: 6379
+          # key_mapper:
+          #   - source: "path"
+          #     param: "aggregateID"

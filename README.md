@@ -23,7 +23,7 @@
 - Estratégia de armazenamento que será utilizada
     - permitido: memory, redis
 
-**data_mapper**
+**key_mapper**
 - Possibilita configurar elementos da request (path/query param, header e etc) para ser utilizado como key do redis, portanto só deve ser declarado quando `strategy=redis`.
     - permitido: No momento só é possível utilizar `path param`, pois os outros elementos estão em desenvolvimento
 

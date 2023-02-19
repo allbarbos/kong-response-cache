@@ -1,12 +1,15 @@
-local cjson        = require "cjson.safe"
-local redis        = require "resty.redis"
+local cjson                  = require "cjson.safe"
+local redis                  = require "resty.redis"
 
-local ngx          = ngx
-local type         = type
-local setmetatable = setmetatable
-local kong_err     = kong.log.err
+local ngx                    = ngx
+local type                   = type
+local setmetatable           = setmetatable
+local log_err                = kong.log.err
+local log_debug              = kong.log.debug
 
-local _M           = {}
+local _M                     = {}
+local redis_pool_size        = 100
+local redis_max_idle_timeout = 10000
 
 --- Create new redis strategy object
 function _M.new(opts)
@@ -26,7 +29,7 @@ end
 local function connect(db, host, port, timeout, password)
   local red, err_redis = redis:new()
   if err_redis then
-    kong_err("error connecting to Redis: ", err_redis);
+    log_err("Error to creates a redis object: ", err_redis);
     return nil, err_redis
   end
 
@@ -36,13 +39,13 @@ local function connect(db, host, port, timeout, password)
   red:set_timeout(timeout)
   local ok, err = red:connect(host, port, redis_opts)
   if not ok then
-    kong_err("failed to connect to Redis: ", err)
+    log_err("Failed to connect to Redis: ", err)
     return nil, err
   end
 
   local times, err2 = red:get_reused_times()
   if err2 then
-    kong_err("failed to get connect reused times: ", err2)
+    log_err("Failed to get connect reused times: ", err2)
     return nil, err
   end
 
@@ -50,7 +53,7 @@ local function connect(db, host, port, timeout, password)
     if is_present(password) then
       local ok3, err3 = red:auth(password)
       if not ok3 then
-        kong_err("failed to auth Redis: ", err3)
+        log_err("Failed to auth Redis: ", err3)
         return nil, err
       end
     end
@@ -58,7 +61,7 @@ local function connect(db, host, port, timeout, password)
     if db ~= 0 then
       local ok4, err4 = red:select(db)
       if not ok4 then
-        kong_err("failed to change Redis database: ", err4)
+        log_err("Failed to change Redis database: ", err4)
         return nil, err
       end
     end
@@ -66,13 +69,30 @@ local function connect(db, host, port, timeout, password)
   return red
 end
 
+--- Puts the current Redis connection immediately into the ngx_lua cosocket connection pool
+-------------------------------------
+-- @param redisDb The current redis object
+-- @param max_idle_timeout Max idle timeout (in ms) when the connection is in the pool
+-- @param pool_size Max size of the pool every nginx worker process
+-- @return Error
+local function set_keepalive(redisDb, max_idle_timeout, pool_size)
+  local _, err = redisDb:set_keepalive(
+    max_idle_timeout or redis_max_idle_timeout,
+    pool_size or redis_pool_size
+  )
+
+  if err then
+    log_err("Failed to set Redis keepalive: ", err)
+    return err
+  end
+end
 
 --- Store a new request entity in the redis
--- @string key The request key
--- @table req_obj The request object, represented as a table containing
---   everything that needs to be cached
--- @int[opt] ttl The TTL for the request; if nil, use default TTL specified
---   at strategy instantiation time
+-------------------------------------
+-- @param key Cache key
+-- @param req_obj The request object, represented as a table containing everything that needs to be cached
+-- @param[opt] ttl The TTL for the request; if nil, use default TTL specified at strategy instantiation time
+-- @return Table representing the request
 function _M:store(key, req_obj, req_ttl)
   local red, err_redis = connect(
     self.opts.database,
@@ -83,12 +103,14 @@ function _M:store(key, req_obj, req_ttl)
   )
 
   if not red then
-    kong_err("failed to get the Redis connection: ", err_redis)
+    log_err("failed to get the Redis connection: ", err_redis)
     return nil, "there is no Redis connection established"
   end
 
   local ttl = req_ttl or self.opts.ttl
+  log_debug("redis expire ttl: ", ttl)
 
+  log_debug("redis key: ", key)
   if type(key) ~= "string" then
     return nil, "key must be a string"
   end
@@ -101,28 +123,24 @@ function _M:store(key, req_obj, req_ttl)
   red:init_pipeline()
   red:set(key, req_json)
 
-  kong.log.debug("redis expire ttl: ", ttl)
   if ttl > 0 then
     red:expire(key, ttl)
   end
 
   local _, err = red:commit_pipeline()
   if err then
-    kong_err("failed to commit the cache value to Redis: ", err)
+    log_err("failed to commit the cache value to Redis: ", err)
     return nil, err
   end
 
-  local ok, err2 = red:set_keepalive(10000, 100)
-  if not ok then
-    kong_err("failed to set Redis keepalive: ", err2)
-    return nil, err2
-  end
+  set_keepalive(red)
 
-  return true and req_json or nil, err
+  return true and req_json
 end
 
 --- Fetch a cached request
--- @string key The request key
+-------------------------------------
+-- @param key The request key
 -- @return Table representing the request
 function _M:fetch(key)
   local red, err_redis = connect(
@@ -134,7 +152,7 @@ function _M:fetch(key)
   )
 
   if not red then
-    kong_err("failed to get the Redis connection: ", err_redis)
+    log_err("failed to get the Redis connection: ", err_redis)
     return nil, "there is no Redis connection established"
   end
 
@@ -151,11 +169,7 @@ function _M:fetch(key)
     end
   end
 
-  local ok, err2 = red:set_keepalive(10000, 100)
-  if not ok then
-    kong_err("failed to set Redis keepalive: ", err2)
-    return nil, err2
-  end
+  set_keepalive(red)
 
   local req_obj = cjson.decode(req_json)
   if not req_obj then
@@ -166,7 +180,9 @@ function _M:fetch(key)
 end
 
 --- Purge an entry from the request cache
--- @return true on success, nil plus error message otherwise
+-------------------------------------
+-- @param key Cache key
+-- @return true on success and error otherwise
 function _M:purge(key)
   local red, err_redis = connect(
     self.opts.database,
@@ -176,9 +192,8 @@ function _M:purge(key)
     self.opts.password
   )
 
-  -- Compruebo si he conectado a Redis bien
   if not red then
-    kong_err("failed to get the Redis connection: ", err_redis)
+    log_err("failed to get the Redis connection: ", err_redis)
     return nil, "there is no Redis connection established"
   end
 
@@ -188,15 +203,11 @@ function _M:purge(key)
 
   local _, err = red:del(key)
   if err then
-    kong_err("failed to delete the key from Redis: ", err)
+    log_err("failed to delete the key from Redis: ", err)
     return nil, err
   end
 
-  local ok, err2 = red:set_keepalive(10000, 100)
-  if not ok then
-    kong_err("failed to set Redis keepalive: ", err2)
-    return nil, err2
-  end
+  set_keepalive(red)
 
   return true
 end

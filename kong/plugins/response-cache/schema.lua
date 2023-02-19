@@ -30,7 +30,7 @@ local schema = {
           }
         },
         {
-          data_mapper = {
+          key_mapper = {
             type = "array",
             required = false,
             elements = {
