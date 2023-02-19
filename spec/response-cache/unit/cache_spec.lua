@@ -56,16 +56,16 @@ describe("build_key", function()
   end)
 
   it("make cache key by default", function()
-    ngx.re.gsub.returns("GET /request/test HTTP/1.1")
-    kong.request.get_method.returns("GET")
-    kong.request.get_query.returns({})
-    kong.request.get_headers.returns({
+    mocks.ngx.re.gsub.returns("GET /request/test HTTP/1.1")
+    mocks.kong.request.get_method.returns("GET")
+    mocks.kong.request.get_query.returns({})
+    mocks.kong.router.get_route.returns("036d43c4-8c90-53ec-bbbb-4686e56b75cb")
+    mocks.kong.request.get_headers.returns({
       accept = "*/*",
       ["accept-encoding"] = "gzip, deflate, br",
       connection = "keep-alive",
       host = "test",
     })
-    kong.router.get_route.returns("036d43c4-8c90-53ec-bbbb-4686e56b75cb")
 
     local actual = cache.build_key(cfg)
     assert.equal("7a2af7057deeaebc05a7c25c37f588027977d95d9fabe384a0ce9bf8368878ae", actual)
